@@ -1,7 +1,8 @@
 import requests
 import socket
+from urllib.parse import urlparse
 
-def isValidIPv4Addr(addr: str):
+def isValidIPv6Addr(addr: str):
     try:
         socket.inet_pton(socket.AF_INET, addr)
     except socket.error:
@@ -10,17 +11,20 @@ def isValidIPv4Addr(addr: str):
 
 def parseNodeInfo(ip_port: str, nodeinfo: dict):
     node = {}
+    node['selected'] = False
     node['port'] = int(ip_port.split(':')[-1])
-    addr = ip_port.split(':')[0]
-    if isValidIPv4Addr(addr) == False:
+    val = ip_port.rsplit(':', 1)[0]
+    parsed = urlparse('//{}'.format(val))
+    addr = parsed.hostname
+    if isValidIPv6Addr(addr) == False:
         return node
+    node['selected'] = True
     node['ipaddr'] = addr
     node['type'] = nodeinfo[11]
     node['time'] = nodeinfo[2]
     return node
 
 def getMainnetPeers():
-    port = 8333
     url = 'https://bitnodes.io/api/v1/snapshots/latest/'
     headers = {'Accept': 'application/json'}
     r = requests.get(url=url, headers=headers)
@@ -28,11 +32,11 @@ def getMainnetPeers():
     peers = []
     for k, v in jsonobj['nodes'].items():
         node = parseNodeInfo(k, v)
-        if node['valid'] == True and node['port'] == 8333 and node['type'] != 'TOR':
+        if node['selected'] == True:
             peers.append(node)
     return peers
 
-peers = getMainnetPeers()
-for peer in peers:
-    print(peer['ipaddr'])
-print(len(peers))
+if __name__ == '__main__':
+    peers = getMainnetPeers()
+    for peer in peers:
+        print('%s\t\t\t%d' % (peer['ipaddr'], peer['port']))

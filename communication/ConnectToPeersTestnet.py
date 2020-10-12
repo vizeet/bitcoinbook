@@ -139,7 +139,7 @@ def sendVersion(s: socket):
     except Exception as e:
         print('Exception closed because of ', e.message)
         s.close()
-    magic = 0xD9B4BEF9
+    magic = 0x0709110B
     command = 'version'
     msg = createMessage(magic, command, payload)
     print('sent_msg = %s' % msg.hex())

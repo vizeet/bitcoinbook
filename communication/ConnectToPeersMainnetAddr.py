@@ -207,173 +207,177 @@ def checkMessage(data_m: mmap, msg: dict, msglen: int):
     data_m.seek(start)
     return data_m
 
-def parseVersionPayload(payload_m: mmap, msglen: int):
-    msg = {}
+def parseVersionPayload(payload_m: mmap, payloadlen: int):
+    payload = {}
     start = payload_m.tell()
-    msg['version'] = int.from_bytes(payload_m.read(4), byteorder='little')
-    msg['services'] = int.from_bytes(payload_m.read(8), byteorder='little')
-    msg['timestamp'] = int.from_bytes(payload_m.read(8), byteorder='little')
-    msg['dt'] = datetime.datetime.fromtimestamp(msg['timestamp']).strftime('%Y-%m-%d %H:%M:%S')
-    msg['addr_recv'] = parseIPAddress(payload_m)
-    msg['addr_trans'] = parseIPAddress(payload_m)
-    msg['nonce'] = int.from_bytes(payload_m.read(8), byteorder='little')
-    msg['user_agent_size'] = getVarInt(payload_m)
-    msg['user_agent'] = payload_m.read(msg['user_agent_size'])
-    msg['block_height'] = int.from_bytes(payload_m.read(4), byteorder='little')
-    if payload_m.tell() - start != msglen:
-        msg['relay'] = int.from_bytes(payload_m.read(1), byteorder='little')
-    return msg
+    payload['version'] = int.from_bytes(payload_m.read(4), byteorder='little')
+    payload['services'] = int.from_bytes(payload_m.read(8), byteorder='little')
+    payload['timestamp'] = int.from_bytes(payload_m.read(8), byteorder='little')
+    payload['dt'] = datetime.datetime.fromtimestamp(payload['timestamp']).strftime('%Y-%m-%d %H:%M:%S')
+    payload['addr_recv'] = parseIPAddress(payload_m)
+    payload['addr_trans'] = parseIPAddress(payload_m)
+    payload['nonce'] = int.from_bytes(payload_m.read(8), byteorder='little')
+    payload['user_agent_size'] = getVarInt(payload_m)
+    payload['user_agent'] = payload_m.read(payload['user_agent_size'])
+    payload['block_height'] = int.from_bytes(payload_m.read(4), byteorder='little')
+    if payload_m.tell() - start != payloadlen:
+        payload['relay'] = int.from_bytes(payload_m.read(1), byteorder='little')
+    return payload
 
 def parseAddrPayload(payload_m: mmap):
-    msg = {}
-    msg['count'] = getVarInt(payload_m)
-    msg['addrs'] = []
-    for i in range(msg['count']):
+    payload = {}
+    payload['count'] = getVarInt(payload_m)
+    payload['addrs'] = []
+    for i in range(payload['count']):
         addr = {}
         addr['timestamp'] = int.from_bytes(payload_m.read(4), byteorder='little')
         addr['addr'] = parseIPAddress(payload_m)
-    return msg
+    return payload
 
 def parseFilterLoadPayload(payload_m: mmap):
-    msg = {}
-    msg['filter'] = getVarInt(payload_m)
-    msg['nHashFuncs'] = int.from_bytes(payload_m.read(4), byteorder='little')
-    msg['nTweak'] = int.from_bytes(payload_m.read(4), byteorder='little')
-    msg['nFlags'] = int.from_bytes(payload_m.read(1), byteorder='little')
-    return msg
+    payload = {}
+    payload['filter'] = getVarInt(payload_m)
+    payload['nHashFuncs'] = int.from_bytes(payload_m.read(4), byteorder='little')
+    payload['nTweak'] = int.from_bytes(payload_m.read(4), byteorder='little')
+    payload['nFlags'] = int.from_bytes(payload_m.read(1), byteorder='little')
+    return payload
 
-def parseFilterAddPayload(payload_m: mmap, msg: dict, msglen: int):
-    msg = {}
-    msg['data'] = getVarInt(payload_m)
-    return msg
+def parseFilterAddPayload(payload_m: mmap, payload: dict, payloadlen: int):
+    payload = {}
+    payload['data'] = getVarInt(payload_m)
+    return payload
 
 def parseMerkleBlockPayload(payload_m: mmap):
-    msg = {}
-    msg['version'] = int.from_bytes(payload_m.read(4), byteorder='little')
-    msg['prev_block'] = payload_m.read(32)[::-1].hex()
-    msg['merkle_root'] = payload_m.read(32)[::-1].hex()
-    msg['timestamp'] = int.from_bytes(payload_m.read(4), byteorder='little')
-    msg['dt'] = datetime.datetime.fromtimestamp(msg['timestamp']).strftime('%Y-%m-%d %H:%M:%S')
-    msg['bits'] = payload_m.read(4)[::-1].hex()
-    msg['nonce'] = int.from_bytes(payload_m.read(4), byteorder='little')
-    msg['total_transactions'] = int.from_bytes(payload_m.read(4), byteorder='little')
-    msg['hash_count'] = getVarInt(payload_m)
-    msg['hashes'] = []
-    for i in msg['hash_count']:
+    payload = {}
+    payload['version'] = int.from_bytes(payload_m.read(4), byteorder='little')
+    payload['prev_block'] = payload_m.read(32)[::-1].hex()
+    payload['merkle_root'] = payload_m.read(32)[::-1].hex()
+    payload['timestamp'] = int.from_bytes(payload_m.read(4), byteorder='little')
+    payload['dt'] = datetime.datetime.fromtimestamp(payload['timestamp']).strftime('%Y-%m-%d %H:%M:%S')
+    payload['bits'] = payload_m.read(4)[::-1].hex()
+    payload['nonce'] = int.from_bytes(payload_m.read(4), byteorder='little')
+    payload['total_transactions'] = int.from_bytes(payload_m.read(4), byteorder='little')
+    payload['hash_count'] = getVarInt(payload_m)
+    payload['hashes'] = []
+    for i in payload['hash_count']:
         txhash = payload_m.read(32)[::-1].hex()
-        msg['hashes'].append(txhash)
-    msg['flag_bytes'] = getVarInt(payload_m)
-    msg['flags'] = payload_m.read(msg['flag_bytes'])[::-1].hex()
-    return msg
+        payload['hashes'].append(txhash)
+    payload['flag_bytes'] = getVarInt(payload_m)
+    payload['flags'] = payload_m.read(payload['flag_bytes'])[::-1].hex()
+    return payload
 
 def parsePingPongPayload(payload_m: mmap):
-    msg = {}
-    msg['nonce'] = int.from_bytes(payload_m.read(8), byteorder='little')
-    return msg
+    payload = {}
+    payload['nonce'] = int.from_bytes(payload_m.read(8), byteorder='little')
+    return payload
 
 def parseFeeFilterPayload(payload_m: mmap):
-    msg = {}
-    msg['feerate'] = int.from_bytes(payload_m.read(8), byteorder='little')
-    return msg
+    payload = {}
+    payload['feerate'] = int.from_bytes(payload_m.read(8), byteorder='little')
+    return payload
 
 def parseInvPayload(payload_m: mmap):
-    msg = {}
-    msg['count'] = getVarInt(payload_m)
-    msg['inventory'] = {}
-    for i in msg['count']:
-        msg['inventory']['type'] = payload_m.read(4)[::-1].hex()
-        msg['inventory']['hash'] = payload_m.read(32)[::-1].hex()
+    payload = {}
+    payload['count'] = getVarInt(payload_m)
+    payload['inventory'] = {}
+    for i in payload['count']:
+        payload['inventory']['type'] = payload_m.read(4)[::-1].hex()
+        payload['inventory']['hash'] = payload_m.read(32)[::-1].hex()
     return msg
 
 def parseGetDataPayload(payload_m: mmap):
-    msg = {}
-    msg['count'] = getVarInt(payload_m)
-    msg['inventory'] = {}
-    for i in msg['count']:
-        msg['inventory']['type'] = payload_m.read(4)[::-1].hex()
-        msg['inventory']['hash'] = payload_m.read(32)[::-1].hex()
-    return msg
+    payload = {}
+    payload['count'] = getVarInt(payload_m)
+    payload['inventory'] = {}
+    for i in payload['count']:
+        inv = {}
+        inv['type'] = payload_m.read(4)[::-1].hex()
+        inv['hash'] = payload_m.read(32)[::-1].hex()
+        payload['inventory'].append(inv)
+    return payload
 
 def parseNotFoundPayload(payload_m: mmap):
-    msg = {}
-    msg['count'] = getVarInt(payload_m)
-    msg['inventory'] = {}
-    for i in msg['count']:
-        msg['inventory']['type'] = payload_m.read(4)[::-1].hex()
-        msg['inventory']['hash'] = payload_m.read(32)[::-1].hex()
-    return msg
+    payload = {}
+    payload['count'] = getVarInt(payload_m)
+    payload['inventory'] = []
+    for i in payload['count']:
+        inv = {}
+        inv['type'] = payload_m.read(4)[::-1].hex()
+        inv['hash'] = payload_m.read(32)[::-1].hex()
+        payload['inventory'].append(inv)
+    return payload
 
 def parseTxPayload(payload_m: mmap):
-    msg = {}
-    msg['version'] = int.from_bytes(payload_m.read(4), byteorder='little')
-    msg['tx_in count'] = getVarInt(payload_m)
-    if msg['tx_in count'] == 0:
+    payload = {}
+    payload['version'] = int.from_bytes(payload_m.read(4), byteorder='little')
+    payload['tx_in count'] = getVarInt(payload_m)
+    if payload['tx_in count'] == 0:
         # check if segwit
-        msg['is_segwit'] = bool(int.from_bytes(payload_m.read(1), byteorder='little'))
-        if msg['is_segwit'] == True:
-                msg['tx_in count'] = getVarInt(payload_m)
-    msg['tx_in'] = []
-    for i in range(msg['tx_in count']):
+        payload['is_segwit'] = bool(int.from_bytes(payload_m.read(1), byteorder='little'))
+        if payload['is_segwit'] == True:
+                payload['tx_in count'] = getVarInt(payload_m)
+    payload['tx_in'] = []
+    for i in range(payload['tx_in count']):
         txin = {}
         txin['prev_tx_hash'] = payload_m.read(32)[::-1].hex()
         txin['prev_tx_out_index'] = int.from_bytes(payload_m.read(4), byteorder='little')
         txin['bytes_scriptsig'] = getVarInt(payload_m)
         txin['sriptsig'] = blk_m.read(inp['bytes_scriptsig']).hex()
         txin['sequence'] = blk_m.read(4)[::-1].hex()
-        msg['tx_in'].append(txin)
+        payload['tx_in'].append(txin)
     tx['out_cnt'] = getVarInt(payload_m)
-    msg['tx_out'] = []
-    for i in range(msg['tx_out count']):
+    payload['tx_out'] = []
+    for i in range(payload['tx_out count']):
         txout = {}
         txout['satoshis'] = int.from_bytes(payload_m.read(8), byteorder='little')
         txout['bytes_scriptpubkey'] = getVarInt(payload_m)
         txout['scriptpubkey'] = payload_m.read(txout['bytes_scriptpubkey']).hex()
-        msg['tx_out'].append(txout)
-    msg['locktime'] = int.from_bytes(payload_m.read(4), byteorder='little')
+        payload['tx_out'].append(txout)
+    payload['locktime'] = int.from_bytes(payload_m.read(4), byteorder='little')
 
-    if 'is_segwit' in msg and msg['is_segwit'] == True:
-        for i in range(msg['tx_in count']):
+    if 'is_segwit' in payload and payload['is_segwit'] == True:
+        for i in range(payload['tx_in count']):
             txn['tx_in'][i]['witness_count'] = getVarInt(payload_m)
             txn['tx_in'][i]['witness'] = []
-            for j in range(msg['tx_in'][i]['witness_count']):
+            for j in range(payload['tx_in'][i]['witness_count']):
                 tx_witness = {}
                 tx_witness['size'] = getVarInt(payload_m)
                 tx_witness['witness'] = bytes.fromhex(payload_m.read(txn_witness['size']).hex())
                 txn['tx_in'][i]['witness'].append(tx_witness)
-        msg['locktime'] = int.from_bytes(payload_m.read(4), byteorder='little')
+        payload['locktime'] = int.from_bytes(payload_m.read(4), byteorder='little')
 
-        return msg
+        return payload
 
 def parseBlockPayload(payload_m: mmap):
-    msg = {}
-    msg['version'] = int.from_bytes(payload_m.read(4), byteorder='little')
-    msg['prev_blockhash'] = payload_m.read(32)[::-1].hex()
-    msg['merkle_root'] = payload_m.read(32)[::-1].hex()
-    msg['timestamp'] = int.from_bytes(payload_m.read(4), byteorder='little')
-    msg['bits'] = payload_m.read(4)[::-1].hex()
-    msg['nonce'] = payload_m.read(4)[::-1].hex()
-    msg['txn_count'] = getVarInt(payload_m)
-    msg['txns'] = []
-    for i in msg['txn_count']:
-        msg['txns'].append(parseTxPayload(payload_m))
-    return msg
+    payload = {}
+    payload['version'] = int.from_bytes(payload_m.read(4), byteorder='little')
+    payload['prev_blockhash'] = payload_m.read(32)[::-1].hex()
+    payload['merkle_root'] = payload_m.read(32)[::-1].hex()
+    payload['timestamp'] = int.from_bytes(payload_m.read(4), byteorder='little')
+    payload['bits'] = payload_m.read(4)[::-1].hex()
+    payload['nonce'] = payload_m.read(4)[::-1].hex()
+    payload['txn_count'] = getVarInt(payload_m)
+    payload['txns'] = []
+    for i in payload['txn_count']:
+        payload['txns'].append(parseTxPayload(payload_m))
+    return payload
 
 def parseGetBlocksGetHeadersPayload(payload_m: mmap):
-    msg = {}
-    msg['version'] = int.from_bytes(payload_m.read(4), byteorder='little')
-    msg['hash count'] = getVarInt(payload_m)
-    msg['block locator hashes'] = []
-    for i in msg['hash count']:
+    payload = {}
+    payload['version'] = int.from_bytes(payload_m.read(4), byteorder='little')
+    payload['hash count'] = getVarInt(payload_m)
+    payload['block locator hashes'] = []
+    for i in payload['hash count']:
         h = payload_m.read(32)[::-1].hex()
-        msg['block locator hashes'].append(h)
-    msg['hash_stop'] = payload_m.read(32)[::-1].hex()
-    return msg
+        payload['block locator hashes'].append(h)
+    payload['hash_stop'] = payload_m.read(32)[::-1].hex()
+    return payload
 
 def parseHeadersPayload(payload_m: mmap):
-    msg = {}
-    msg['count'] = getVarInt(payload_m)
-    msg['headers'] = []
-    for i in msg['count']:
+    payload = {}
+    payload['count'] = getVarInt(payload_m)
+    payload['headers'] = []
+    for i in payload['count']:
         hdr = {}
         hdr['version'] = int.from_bytes(payload_m.read(4), byteorder='little')
         hdr['prev_blockhash'] = payload_m.read(32)[::-1].hex()
@@ -382,21 +386,20 @@ def parseHeadersPayload(payload_m: mmap):
         hdr['bits'] = payload_m.read(4)[::-1].hex()
         hdr['nonce'] = payload_m.read(4)[::-1].hex()
         hdr['txn_count'] = getVarInt(payload_m)
-        msg['headers'].append(hdr)
-    return msg
+        payload['headers'].append(hdr)
+    return payload
 
-def parseRejectPayload(payload_m: mmap, msglen: int):
-    msg = {}
+def parseRejectPayload(payload_m: mmap, payloadlen: int):
+    payload = {}
     start = payload_m.tell()
-    msg['message'] = getVarInt(payload_m)
+    payload['message'] = getVarInt(payload_m)
     hdr['ccode'] = payload_m.read(1)[::-1].hex()
-    msg['reason'] = getVarInt(payload_m)
-    datalen = payload_m.tell() - start - msglen
+    payload['reason'] = getVarInt(payload_m)
+    datalen = payload_m.tell() - start - payloadlen
     print('parseRejectPayload: datalen = %d' % datalen)
     if datalen > 0:
-        msg['data'] = payload_m.read(datalen).hex()
-    return msg
-
+        payload['data'] = payload_m.read(datalen).hex()
+    return payload
 
 CMD_FN_MAP = {
     'addr': parseAddrPayload,
@@ -526,33 +529,87 @@ def createInvBlkPayload():
     blk_hash_b = bytes.fromhex(blk_hash)[::-1]
     inv_vect_b = b''
     for i in count:
-        blk_type_b = struct.pack('<L', MSG_BLOCK)
-        inv_vect_b += blk_type_b + blk_hash_b
+        inv_type_b = struct.pack('<L', MSG_BLOCK)
+        inv_vect_b += inv_type_b + blk_hash_b
     payload = count_b + inv_vect_b
     return payload
 
-def createGetDataPayload():
+def createInvTxPayload():
+    MSG_TX = 1
+    tx_list = rpc_connection.getrawmempool()
+    count = len(tx_list)
+    count_b = setVarInt(count)
+    inv_vect_b = b''
+    for tx in txlist:
+        tx_b = bytes.fromhex(tx)[::-1]
+        inv_type_b = struct.pack('<L', MSG_TX)
+        inv_vect_b += inv_type_b + tx_b
+    payload = count_b + inv_vect_b
+    return payload
+
+def createGetDataPayload(recvdpayload: dict):
+    MSG_TX = 1
+    MSG_BLOCK = 2
+    MSG_FILTERED_BLOCK = 3
+    MSG_CMPCT_BLOCK = 4
+
+    inv_vect_b = b''
+    tx_list = rpc_connection.getrawmempool()
+    count = 0
+    for i in recvdpayload['count']:
+        inv_type_b = recvdpayload['inventory'][i]['type']
+        tx_type_b = struct.pack('<L', inv_type)
+        if inv_type == MSG_TX: 
+            if tx in tx_list:
+                tx_b = bytes.fromhex(tx)[::-1]
+                tx = recvdpayload['inventory'][i]['hash']
+                inv_vect_b += inv_type_b + tx_b
+                count++
+        elif inv_type == MSG_BLOCK:
+            blk_hash = recvdpayload['inventory'][i]['hash']
+            try:
+                blk = rpc_connection.getblock(blk_hash)
+                inv_vect_b += inv_type_b + blk_hash_b
+                count++
+            except Exception as e:
+                continue
+    count_b = setVarInt(count)
+    payload = count_b + inv_vext_b
+    return payload
+
+def createHeadersPayload(hashes, stophash):
+    b_cnt_d = {'fd': 2, 'fe': 4, 'ff': 8}
+    revhashes = hashes[::-1]
+    found = False
+    for blk_hash in revhashes:
+        try:
+            blk = rpc_connection.getblock(blk_hash)
+            found = True
+            break
+        except Exception as e:
+            continue
+    if found == True:
+        txcnt = 0
+        txcnt_b = setVarInt(txcnt)
+        headers_b = b''
+        count = 0
+        while True:
+            # returns block hex
+            blk = rpc_connection.getblock(blk_hash, False)
+            blk_b = bytes.fromhex(blk)
+            blkhdr_b = blk_b[:80]
+            headers_b += blkhdr_b + txcnt_b
+            blk = rpc_connection.getblock(blk_hash)
+            count += 1
+            if count == 2000 or 'nextblockhash' not in blk_hash or stophash == blk_hash:
+                break
+            blk_hash = blk['nextblockhash']
+        cnt_b = setVarInt(count)
+        payload = cnt_b + headers_b
+        return payload
+
 
 CMDS_WITHOUT_PAYLOAD = ['verack', 'sendheaders', 'getaddr', 'filterclear', 'mempool']
-
-def sendcmd(s: socket, peerinfo: dict, cmd: str):
-    global CMDS_WITHOUT_PAYLOAD
-    if cmd in CMDS_WITHOUT_PAYLOAD:
-        payload = b''
-    elif cmd == 'version':
-        payload = createVersionPayload(s)
-    elif cmd == 'addr':
-        peer = getRandomPeer()
-        payload = createAddrPayload(s, [peer])
-    elif cmd == 'ping' or cmd == 'pong':
-        payload = createPingPongPayload(s)
-    elif cmd == 'feefilter':
-        payload = createFeeFilterPayload(s)
-    elif cmd == 'inv':
-        createInvBlkPayload(s)
-    elif cmd == 'getdata':
-        createInvBlkPayload(s)
-    createMessage(cmd, payload)
 
 CMD_RESP_D = {
         'version': 'verack', 
@@ -566,7 +623,7 @@ CMD_RESP_D = {
         'getdata': 'getdatalist'
 }
 
-def recvMsg(s: socket, is_connected: bool, wairesplist: list, getall: bool):
+def recvMsg(s: socket):
     msg = getMsg(s)
     msglen = len(msg)
     msg_m = mmap.mmap(-1, msglen + 1)
@@ -583,6 +640,31 @@ def sendMsg(s: socket, msg: bytes):
     print('response = %s' % response_data.hex())
     return response_data
 
+CMD_RESP_D = {
+        'version': ['verack'], 
+        'verack': [],
+        'getaddr': ['addr'],
+        'addr': [],
+        'ping': ['pong'],
+        'pong': [],
+        'filterload': ['filteradd', 'filterclear'], 
+        'sendheaders': [],
+        'feefilter': [],
+        'getheaders': ['headers'],
+        'getblocks': ['inv'],
+        'mempool': ['inv'],
+        'inv': ['getdata'],
+        'getdata': ['tx', 'block', 'merkleblock', 'cmpctblock', 'notfound'],
+        'reject': [],
+        'sendcmpct': [],
+        'cmpctblock': [],
+        'getblocktxn': ['blocktxn', 'block']
+        }
+
+def removeExpectedResponse(cmd: str):
+    global CMD_RESP_D
+    CMD_RESP_D = [x for x in CMD_RESP_D if cmd not in x]
+
 def sendrecvHandler(s: socket, peerinfo: dict, cmdlist: list):
     is_connected = False
     version_recvd = False
@@ -592,59 +674,85 @@ def sendrecvHandler(s: socket, peerinfo: dict, cmdlist: list):
     itr = iter(cmdlist)
     sndcmd = 'version'
     payload = createVersionPayload(s)
-    sndmsg = createMessage(cmd, payload)
+    sndmsg = createMessage(sndcmd, payload)
     sendMsg(s, sndmsg)
-    while sndcmd != None:
-        recvmsg = recvMsg(s, is_connected, waitresplist, getall=False)
-        if recvmsg['command'] == 'version':
-            version_recvd = True
-            sndcmd = 'verack'
-            payload = b''
-            verack_sent = True
-            is_connected = version_recvd and verack_recvd and verack_sent
-        elif recvmsg['command'] == 'verack':
-            is_connected = version_recvd and verack_recvd and verack_sent
-        elif recvmsg['command'] == 'getaddr':
-            cmd = 'addr'
-            peer = getRandomPeer()
-            payload = createAddrPayload(s, [peer])
-        elif recvmsg['command'] == 'ping':
-            recvmsg['']
-            sndcmd = 'pong'
-            payload = createPongPayload(s, nonce)
-        elif recvmsg['command'] == 'filterload':
-            sndcmd = 'filteradd'
-        elif recvmsg['command'] == 'sendheaders':
-            if 'opt' not in peerinfo:
-                peerinfo['opt'] = []
-            peerinfo['opt'].append('sendheaders')
-        elif recvmsg['command'] == 'feefilter':
-            if 'feefilter' not in peerinfo:
-                peerinfo['feefilter']
-            peerinfo['feefilter'] = recvmsg['feefilter']['feerate']
-        elif recvmsg['command'] == 'getheaders':
-            sndcmd = 'headers'
-            params = (recvmsg['getheaders']['headerhashes'], recvmsg['getheaders']['stophash'])
-        elif recvmsg['command'] == 'getblocks':
-            sndcmd = 'inv'
-            params = (msg['getheaders']['headerhashes'], msg['getheaders']['stophash'])
-        elif recvmsg['command'] == 'mempool':
-            sndcmd = 'inv'
-        elif recvmsg['command'] == 'inv':
-            sndcmd = 'getdata'
-            params = msg['inv']
-        elif recvmsg['command'] == 'getdata':
-            sndcmd = 'getdatalist'
-            params = msg['getdata']
-
-        sndmsg = createMessage(sndcmd, payload)
+    wait_resp_l = [CMD_RESP_D[sndcmd]]
+    while True:
+        sndcmd = None
+        if len(wait_resp_l) != 0:
+            recvmsg = recvMsg(s)
+            if is_connected == False:
+                if recvmsg['command'] == 'version':
+                    version_recvd = True
+                    sndcmd = 'verack'
+                    payload = b''
+                    verack_sent = True
+                    is_connected = version_recvd and verack_recvd and verack_sent
+                elif recvmsg['command'] == 'verack':
+                    is_connected = version_recvd and verack_recvd and verack_sent
+                else:
+                    raise Exception('Not connected yet but got %s' % recvmsg['command'])
+            else:
+                removeExpectedResponse(recvmsg['command'])
+                if recvmsg['command'] == 'getaddr':
+                    cmd = 'addr'
+                    peer = getRandomPeer()
+                    payload = createAddrPayload(s, [peer])
+                elif recvmsg['command'] == 'ping':
+                    sndcmd = 'pong'
+                    payload = createPongPayload(s, nonce)
+                elif recvmsg['command'] == 'filterload':
+                    sndcmd = 'filteradd'
+                    payload = createFilteraddPayload(s)
+                elif recvmsg['command'] == 'sendheaders':
+                    if 'opt' not in peerinfo:
+                        peerinfo['opt'] = []
+                    peerinfo['opt'].append('sendheaders')
+                elif recvmsg['command'] == 'feefilter':
+                    if 'feefilter' not in peerinfo:
+                        peerinfo['feefilter']
+                    peerinfo['feefilter'] = recvmsg['feefilter']['feerate']
+                elif recvmsg['command'] == 'getheaders':
+                    sndcmd = 'headers'
+                    hashes = recvmsg['getheaders']['block locator hashes']
+                    stophash = recvmsg['getheaders']['hash_stop']
+                    payload = createHeadersPayload(s, hashes, stophash)
+                elif recvmsg['command'] == 'getblocks':
+                    sndcmd = 'inv'
+                    payload = createInvBlkPayload()
+                elif recvmsg['command'] == 'mempool':
+                    sndcmd = 'inv'
+                    payload = createInvTxPayload()
+                elif recvmsg['command'] == 'inv':
+                    sndcmd = 'getdata'
+                    payload = createGetDataPayload(msg['getdata'])
+                elif recvmsg['command'] == 'getdata':
+                    # this will initiate multiple commands
+                    sndcmd = 'senddatalist'
+                    params = msg['getdata']
+                    payload = createSendDataListPayload(s, msg['getdata'])
+        else:
             sndcmd = next(itr)
-            if msg['command'] == 'verack':
-                verack_recvd = True
-                is_connected = version_recvd and verack_recvd and verack_sent
-        if cmd == None: # get all unprocessed messages
-            recvmsg = recvMsg(s, is_connected, wairesplist, getall=True)
-        print(recvmsg)
+            if sndcmd in CMDS_WITHOUT_PAYLOAD:
+                payload = b''
+            elif sndcmd == 'invtx': # inv with tx payload
+                payload = createInvTxPayload()
+            elif sndcmd == 'invblk': # inv with block payload
+                payload = createInvBlkPayload()
+            elif sndcmd == 'ping':
+                payload = createPingPayload()
+            elif sndcmd == 'getblocks':
+                payload = createGetBlocksPayload(s)
+            elif sndcmd == 'sendcmpct':
+                payload = createSendCmpctPayload(s)
+            elif sndcmd == 'cmpctblock':
+                payload = createCmpctBlockPayload(s)
+            elif sndcmd == 'feefilter':
+                payload = createFeeFilterPayload(s)
+        wait_resp_l.append(CMD_RESP_D[sndcmd])
+        if sndcmd != None:
+            sndmsg = createMessage(sndcmd, payload)
+            sendMsg(s, sndmsg)
 
 if __name__ == '__main__':
     peers = getMainnetPeers()
