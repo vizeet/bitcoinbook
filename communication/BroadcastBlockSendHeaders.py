@@ -20,6 +20,7 @@ flog = open('communication.log', 'wt+')
 
 def getLastBlockHeight():
     height = rpc_connection.getblockcount()
+    print('height = %d' % height)
     return height
 
 def getGenesisBlockHash():
@@ -345,6 +346,17 @@ def parseFeeFilterPayload(payload_m: mmap, payloadlen = 0):
     payload['feerate'] = int.from_bytes(payload_m.read(8), byteorder='little')
     return payload
 
+def parseInvPayload(payload_m: mmap, payloadlen = 0):
+    payload = {}
+    payload['count'] = getVarInt(payload_m)
+    payload['inventory'] = []
+    for i in range(payload['count']):
+        inv = {}
+        inv['type'] = int.from_bytes(payload_m.read(4), byteorder='little')
+        inv['hash'] = payload_m.read(32)[::-1].hex()
+        payload['inventory'].append(inv)
+    return payload
+
 CMD_FN_MAP = {
     'version': parseVersionPayload,
     'addr': parseAddrPayload,
@@ -354,7 +366,8 @@ CMD_FN_MAP = {
     'getblocks': parseGetBlocksGetHeadersPayload,
     'headers': parseHeadersPayload,
     'block': parseBlockPayload,
-    'feefilter': parseFeeFilterPayload
+    'feefilter': parseFeeFilterPayload,
+    'inv': parseInvPayload
 }
 
 def parseMsgHdr(msghdr_b: bytes):
@@ -382,8 +395,8 @@ def getRandomPeer():
     return peer
 
 def createVersionPayload(s: socket):
-#    version_b = struct.pack('<L', 70015)
-    version_b = struct.pack('<L', 70013)
+    version_b = struct.pack('<L', 70015)
+#    version_b = struct.pack('<L', 70013)
     services_b = struct.pack('<Q', 1)
     timestamp_b = struct.pack('<Q', int(time.time()))
     myip, myport = s.getsockname()
@@ -392,8 +405,9 @@ def createVersionPayload(s: socket):
     nonce_b = struct.pack('<Q', random.getrandbits(64))
     user_agent = createUserAgent()
     user_agent_b = struct.pack('<%ds' % len(user_agent), user_agent)
-    start_height_b = struct.pack('<L', 0)
-    payload = version_b + services_b + timestamp_b + addr_recv_b + addr_trans_b + nonce_b + user_agent_b + start_height_b
+    start_height_b = struct.pack('<L', getLastBlockHeight())
+    relay_b = struct.pack('<B', 1)
+    payload = version_b + services_b + timestamp_b + addr_recv_b + addr_trans_b + nonce_b + user_agent_b + start_height_b + relay_b
     return payload
 
 def createPongPayload(nonce: int):
@@ -401,7 +415,8 @@ def createPongPayload(nonce: int):
     return nonce_b
 
 def createGetHeadersPayload(hdr_info_l: list):
-    version_b = struct.pack('<L', 70013)
+    version_b = struct.pack('<L', 70015)
+#    version_b = struct.pack('<L', 70013)
     blk_locator_hashes_b = b''
     count = 0
     for i in range(len(hdr_info_l) - 1, len(hdr_info_l) - 32, -1):
@@ -430,6 +445,30 @@ def createGetDataPayload(count: int, hash_l: list):
     payload_b = hash_count_b + hashes_b
     return payload_b
 
+def createGetHeadersPayloadFromCoreCLI():
+    version_b = struct.pack('<L', 70015)
+    blk_locator_hashes_b = b''
+    count = 32
+    height = getLastBlockHeight()
+    for i in range(0, 31):
+        print(height - i)
+        blkhash = rpc_connection.getblockhash(height - i)
+        blk_locator_hashes_b += bytes.fromhex(blkhash)[::-1]
+    blk_locator_hashes_b += bytes.fromhex(getGenesisBlockHash())[::-1]
+    hash_count_b = setVarInt(count)
+    stop_hash_b = bytes(32)
+    payload = version_b \
+            + hash_count_b \
+            + blk_locator_hashes_b \
+            + stop_hash_b
+    return payload
+
+def createSendCompactPayload(announce: int, version: int):
+    announce_b = struct.pack('<B', announce)
+    version_b = struct.pack('<Q', version)
+    payload = announce_b + version_b
+    return payload
+
 MSGHDR_SIZE = 24
 
 def recvAll(s: socket, payloadlen: int):
@@ -457,10 +496,10 @@ def recvMsg(s: socket):
     if payloadlen > 0:
         msg['payload'] = CMD_FN_MAP[msg['command']](payload_m, payloadlen)
     print('<== msg = %s' % msg, file=flog)
+    print('<== msg = %s' % msg)
     return msg
 
 def sendPongMessage(s: socket, recvmsg: dict):
-    # send pong message
     sndcmd = 'pong'
     nonce = recvmsg['payload']['nonce']
     payload = createPongPayload(nonce)
@@ -468,15 +507,91 @@ def sendPongMessage(s: socket, recvmsg: dict):
     s.send(sndmsg)
     print('==> cmd = %s, msg = %s' % (sndcmd, sndmsg.hex()), file=flog)
 
-def sendHeadersMessage(s: socket, recvmsg: dict):
-    # send header message
-    sndcmd = 'headers'
-    hashes = recvmsg['payload']['block locator hashes']
-    stophash = recvmsg['payload']['hash_stop']
-    payload = createHeadersPayload(hashes, stophash)
+def sendSendHeadersMessage(s: socket):
+    sndcmd = 'sendheaders'
+    payload = b''
     sndmsg = createMessage(sndcmd, payload)
     s.send(sndmsg)
     print('==> cmd = %s, msg = %s' % (sndcmd, sndmsg.hex()), file=flog)
+
+def createHeadersPayloadNoHeaders():
+    cnt_b = setVarInt(0)
+    headers_b = b''
+    payload = cnt_b + headers_b
+    return payload
+
+def sendHeadersMessage(s: socket):
+    sndcmd = 'headers'
+    payload = createHeadersPayloadNoHeaders()
+    sndmsg = createMessage(sndcmd, payload)
+    s.send(sndmsg)
+    print('==> cmd = %s, msg = %s' % (sndcmd, sndmsg.hex()), file=flog)
+
+def sendGetHeadersMessage(s: socket):
+    sndcmd = 'getheaders'
+    payload = createGetHeadersPayloadFromCoreCLI()
+    sndmsg = createMessage(sndcmd, payload)
+    s.send(sndmsg)
+    print('==> cmd = %s, msg = %s' % (sndcmd, sndmsg.hex()), file=flog)
+
+def waitForHeaders(s: socket):
+    while True:
+        recvmsg = recvMsg(s)
+        if recvmsg['command'] == 'headers':
+            break
+        elif recvmsg['command'] == 'ping':
+            sendPongMessage(s, recvmsg)
+        elif recvmsg['command'] == 'getheaders':
+            sendHeadersMessage(s)
+
+    return recvmsg
+
+def sendGetDataMessage(s: socket, count: int, hash_l: list):
+    sndcmd = 'getdata'
+    payload = createGetDataPayload(count, hash_l)
+    sndmsg = createMessage(sndcmd, payload)
+    s.send(sndmsg)
+    print('==> cmd = %s, msg = %s' % (sndcmd, sndmsg.hex()), file=flog)
+
+def waitForBlock(s: socket):
+    while True:
+        recvmsg = recvMsg(s)
+        if recvmsg['command'] == 'block':
+            break
+        elif recvmsg['command'] == 'ping':
+            sendPongMessage(s, recvmsg)
+    return recvmsg
+
+def sendAndHandleGetHeaders(s: socket):
+    sendGetHeadersMessage(s)
+    recvmsg = waitForHeaders(s)
+    count = recvmsg['payload']['count']
+    for i in range(0, count, 16):
+        lindex = i + 16 if i + 16 < count else count
+        blk_l = recvmsg['payload']['headers'][i:lindex]
+        sendGetDataMessage(s, lindex - i, blk_l)
+        for j in range(i, lindex):
+            waitForBlock(s)
+
+def waitForHeaders(s: socket):
+    while True:
+        recvmsg = recvMsg(s)
+        if recvmsg['command'] == 'headers':
+            break
+        elif recvmsg['command'] == 'ping':
+            sendPongMessage(s, recvmsg)
+
+    return recvmsg
+
+def waitAndHandleHeaderResponse(s: socket):
+    recvmsg = waitForHeaders(s)
+    count = recvmsg['payload']['count']
+    for i in range(0, count, 16):
+        lindex = i + 16 if i + 16 < count else count
+        blk_l = recvmsg['payload']['headers'][i:lindex]
+        sendGetDataMessage(s, lindex - i, blk_l)
+        for j in range(i, lindex):
+            waitForBlock(s)
 
 def establishConnection(s: socket):
     # send version messsage
@@ -512,44 +627,16 @@ def establishConnection(s: socket):
         return True
     return False
 
-def sendrecvHeadersData(s: socket, hdr_info_list: list):
-    # send getheaders message
-    sndcmd = 'getheaders'
-    payload = createGetHeadersPayload(hdr_info_list)
-    sndmsg = createMessage(sndcmd, payload)
-    s.send(sndmsg)
-    print('==> cmd = %s, msg = %s' % (sndcmd, sndmsg.hex()), file=flog)
-    while True:
-        recvmsg = recvMsg(s)
-        if recvmsg['command'] == 'headers':
-            break
-        elif recvmsg['command'] == 'ping':
-            sendPongMessage(s, recvmsg)
-
-    print('Received Headers', file=flog)
-    count = recvmsg['payload']['count']
-    for i in range(0, count, 16):
-        lindex = i + 16 if i + 16 < count else count
-        print(i, lindex)
-        blk_l = recvmsg['payload']['headers'][i:lindex]
-        sndcmd = 'getdata'
-        payload = createGetDataPayload(lindex - i, blk_l)
-        sndmsg = createMessage(sndcmd, payload)
-        s.send(sndmsg)
-        print('==> cmd = %s, msg = %s' % (sndcmd, sndmsg.hex()), file=flog)
-        for j in range(i, lindex):
-            while True:
-                recvblkmsg = recvMsg(s)
-                if recvblkmsg['command'] == 'block':
-                    break
-    return recvmsg
+def sendrecvHeadersData(s: socket):
+    sendSendHeadersMessage(s)
+    sendAndHandleGetHeaders(s)
+    waitAndHandleHeaderResponse(s)
 
 def sendrecvHandler(s: socket):
     if establishConnection(s) == False:
         print('Establish connection failed', file=flog)
         return
-    recvmsg = sendrecvHeadersData(s, [])
-    sendrecvHeadersData(s, recvmsg['payload']['headers'])
+    sendrecvHeadersData(s)
     
 if __name__ == '__main__':
     peers = getTestnetPeers()

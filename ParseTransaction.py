@@ -18,7 +18,7 @@ def getCoinbaseTransactionInfo(blk_m: mmap):
     for i in range(tx['inp_cnt']):
         inp = {}
         inp['prev_tx_hash'] = blk_m.read(32)[::-1].hex()
-        inp['prev_tx_out_index'] = blk_m.read(4)[::-1].hex()
+        inp['prev_tx_out_index'] = int.from_bytes(blk_m.read(4), byteorder='little')
         inp['bytes_coinbase_data'] = getVarInt(blk_m)
         pos = blk_m.tell()
         inp['bytes_height'] = getVarInt(blk_m)
@@ -49,7 +49,7 @@ def getTransactionInfo(blk_m: mmap):
     for i in range(tx['inp_cnt']):
         inp = {}
         inp['prev_tx_hash'] = blk_m.read(32)[::-1].hex()
-        inp['prev_tx_out_index'] = blk_m.read(4)[::-1].hex()
+        inp['prev_tx_out_index'] = int.from_bytes(blk_m.read(4), byteorder='little')
         inp['bytes_scriptsig'] = getVarInt(blk_m)
         inp['sriptsig'] = blk_m.read(inp['bytes_scriptsig']).hex()
         inp['sequence'] = blk_m.read(4)[::-1].hex()

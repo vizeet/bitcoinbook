@@ -76,7 +76,9 @@ def isValidIPv4Addr(addr: str):
 
 def createUserAgent():
     sub_version = "/MyTestAgent:0.0.1/"
-    return b'\x0F' + sub_version.encode()
+    sub_version_b = sub_version.encode()
+    len_b = setVarInt(len(sub_version_b))
+    return len_b + sub_version_b
 
 def createRecvIPAddress(ip, port):
     service_b = struct.pack('<Q', 1)
@@ -253,34 +255,64 @@ def recvMsg(s: socket):
     print('<== msg = %s' % msg, file=flog)
     return msg
 
-def sendrecvHandler(s: socket):
-    # send version messsage
+def sendVersionMessage(s: socket):
     sndcmd = 'version'
     payload = createVersionPayload(s)
     sndmsg = createMessage(sndcmd, payload)
-    print('==> cmd = %s, msg = %s' % (sndcmd, sndmsg.hex()), file=flog)
     s.send(sndmsg)
-    # received version message
+    print('==> cmd = %s, msg = %s' % (sndcmd, sndmsg.hex()), file=flog)
+    return True
+
+def waitForVersion(s: socket):
     recvmsg = recvMsg(s)
-    # send verack message
+    vers_recvd = False
+    if recvmsg['command'] != 'version':
+        print('Invalid Response')
+        return False
+    services = recvmsg['payload']['services']
+    if services & 1 == 0x00:
+        print('Peer is not full node')
+        return False
+    return True
+
+def sendVerackMessage(s: socket):
     sndcmd = 'verack'
     payload = b''
     sndmsg = createMessage(sndcmd, payload)
     s.send(sndmsg)
     print('==> cmd = %s, msg = %s' % (sndcmd, sndmsg.hex()), file=flog)
-    # received verack message
+    return True
+
+def waitForVerack(s: socket):
     recvmsg = recvMsg(s)
-    print('Connection is established', file=flog)
-    
+    verack_recvd = False
+    if recvmsg['command'] != 'verack':
+        return False
+    return True
+        
+
+def establishConnection(s: socket):
+    vers_sent = sendVersionMessage(s)
+    vers_recvd = waitForVersion(s)
+    if vers_recvd == False:
+        return False
+    verack_sent = sendVerackMessage(s)
+    verack_recvd = waitForVerack(s)
+    if vers_sent and vers_recvd and verack_sent and verack_recvd:
+        print('Connection is established', file=flog)
+        return True
+    return False
+
 if __name__ == '__main__':
     peers = getTestnetPeers()
-    p = peers[0]
+    p = random.choice(peers)
     s = None
     peerinfo = {}
     print("Trying to connect to ", p, file=flog)
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     err = s.connect(p)
     print('connected', file=flog)
-    sendrecvHandler(s)
+    if establishConnection(s) == False:
+        print('Establish connection failed', file=flog)
     s.close()
     flog.close()

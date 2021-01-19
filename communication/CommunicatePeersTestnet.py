@@ -24,7 +24,9 @@ def getLastBlockHeight():
 
 def createUserAgent():
     sub_version = "/MyTestAgent:0.0.1/"
-    return b'\x0F' + sub_version.encode()
+    sub_version_b = sub_version.encode()
+    len_b = setVarInt(len(sub_version_b))
+    return len_b + sub_version_b
 
 def createRecvIPAddress(ip, port):
     service_b = struct.pack('<Q', 1)

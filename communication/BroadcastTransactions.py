@@ -20,7 +20,12 @@ flog = open('communication.log', 'wt+')
 
 def getLastBlockHeight():
     height = rpc_connection.getblockcount()
+    print('height = %d' % height)
     return height
+
+def getGenesisBlockHash():
+    blkhash = rpc_connection.getblockhash(0)
+    return blkhash
 
 def getNodeAddresses(dnsseed: str):
     dest = '8.8.8.8'
@@ -157,6 +162,8 @@ def checkMessage(msghdr: dict, payload_b: bytes):
     else:
         print('checksum check failed', file=flog)
         print('payload = %s' % payload_b.hex(), file=flog)
+        print('expected length = %d' % msghdr['length'])
+        print('received length = %d' % len(payload_b))
         print('expected checksum = %s' % msghdr['checksum'].hex(), file=flog)
         print('received checksum = %s' % checksum_calc.hex(), file=flog)
         raise Exception('Invalid Checksum')
@@ -228,6 +235,128 @@ def parseGetBlocksGetHeadersPayload(payload_m: mmap, payloadlen = 0):
     payload['hash_stop'] = payload_m.read(32)[::-1].hex()
     return payload
 
+def parseBlockHeader(payload_m: mmap):
+    hdr = {}
+    hdr['version'] = int.from_bytes(payload_m.read(4), byteorder='little')
+    hdr['prev_blockhash'] = payload_m.read(32)[::-1].hex()
+    hdr['merkle_root'] = payload_m.read(32)[::-1].hex()
+    hdr['timestamp'] = int.from_bytes(payload_m.read(4), byteorder='little')
+    hdr['bits'] = payload_m.read(4)[::-1].hex()
+    hdr['nonce'] = payload_m.read(4)[::-1].hex()
+    return hdr
+
+def parseHeadersPayload(payload_m: mmap, payloadlen = 0):
+    payload = {}
+    payload['count'] = getVarInt(payload_m)
+    payload['headers'] = []
+    for i in range(payload['count']):
+        hdr = {}
+        start = payload_m.tell()
+        h_b = hashlib.sha256(payload_m.read(80)).digest()
+        hdr['blkhash'] = hashlib.sha256(h_b).digest()[::-1].hex()
+        payload_m.seek(start)
+        hdr['header'] = parseBlockHeader(payload_m)
+        hdr['txn_count'] = getVarInt(payload_m)
+        payload['headers'].append(hdr)
+    return payload
+
+#def parseTxPayload(payload_m: mmap, payloadlen = 0):
+#    payload = {}
+#    payload['version'] = int.from_bytes(payload_m.read(4), byteorder='little')
+#    payload['tx_in count'] = getVarInt(payload_m)
+#    if payload['tx_in count'] == 0:
+#        # check if segwit
+#        payload['is_segwit'] = bool(int.from_bytes(payload_m.read(1), byteorder='little'))
+#        if payload['is_segwit'] == True:
+#                payload['tx_in count'] = getVarInt(payload_m)
+#    payload['tx_in'] = []
+#    for i in range(payload['tx_in count']):
+#        txin = {}
+#        txin['prev_tx_hash'] = payload_m.read(32)[::-1].hex()
+#        txin['prev_tx_out_index'] = int.from_bytes(payload_m.read(4), byteorder='little')
+#        txin['bytes_scriptsig'] = getVarInt(payload_m)
+#        txin['sriptsig'] = payload_m.read(txin['bytes_scriptsig']).hex()
+#        txin['sequence'] = payload_m.read(4)[::-1].hex()
+#        payload['tx_in'].append(txin)
+#    payload['tx_out count'] = getVarInt(payload_m)
+#    payload['tx_out'] = []
+#    for i in range(payload['tx_out count']):
+#        txout = {}
+#        txout['satoshis'] = int.from_bytes(payload_m.read(8), byteorder='little')
+#        txout['bytes_scriptpubkey'] = getVarInt(payload_m)
+#        txout['scriptpubkey'] = payload_m.read(txout['bytes_scriptpubkey']).hex()
+#        payload['tx_out'].append(txout)
+#    payload['locktime'] = int.from_bytes(payload_m.read(4), byteorder='little')
+#
+#    if 'is_segwit' in payload and payload['is_segwit'] == True:
+#        for i in range(payload['tx_in count']):
+#            payload['tx_in'][i]['witness_count'] = getVarInt(payload_m)
+#            payload['tx_in'][i]['witness'] = []
+#            for j in range(payload['tx_in'][i]['witness_count']):
+#                tx_witness = {}
+#                tx_witness['size'] = getVarInt(payload_m)
+#                tx_witness['witness'] = bytes.fromhex(payload_m.read(txn_witness['size']).hex())
+#                txn['tx_in'][i]['witness'].append(tx_witness)
+#        payload['locktime'] = int.from_bytes(payload_m.read(4), byteorder='little')
+#
+#    return payload
+
+def parseTxPayload(payload_m: mmap, payloadlen = 0):
+    payload = {}
+    payload['version'] = int.from_bytes(payload_m.read(4), byteorder='little')
+    payload['tx_in count'] = getVarInt(payload_m)
+    payload['tx_in'] = []
+    for i in range(payload['tx_in count']):
+        txin = {}
+        txin['prev_tx_hash'] = payload_m.read(32)[::-1].hex()
+        txin['prev_tx_out_index'] = int.from_bytes(payload_m.read(4), 
+                byteorder='little')
+        txin['bytes_scriptsig'] = getVarInt(payload_m)
+        txin['sriptsig'] = payload_m.read(txin['bytes_scriptsig']).hex()
+        txin['sequence'] = payload_m.read(4)[::-1].hex()
+        payload['tx_in'].append(txin)
+    payload['tx_out count'] = getVarInt(payload_m)
+    payload['tx_out'] = []
+    for i in range(payload['tx_out count']):
+        txout = {}
+        txout['satoshis'] = int.from_bytes(payload_m.read(8), byteorder='little')
+        txout['bytes_scriptpubkey'] = getVarInt(payload_m)
+        txout['scriptpubkey'] = payload_m.read(txout['bytes_scriptpubkey']).hex()
+        payload['tx_out'].append(txout)
+    payload['locktime'] = int.from_bytes(payload_m.read(4), byteorder='little')
+
+    return payload
+
+def parseBlockPayload(payload_m: mmap, payloadlen = 0):
+    payload = {}
+    payload['version'] = int.from_bytes(payload_m.read(4), byteorder='little')
+    payload['prev_blockhash'] = payload_m.read(32)[::-1].hex()
+    payload['merkle_root'] = payload_m.read(32)[::-1].hex()
+    payload['timestamp'] = int.from_bytes(payload_m.read(4), byteorder='little')
+    payload['bits'] = payload_m.read(4)[::-1].hex()
+    payload['nonce'] = payload_m.read(4)[::-1].hex()
+    payload['txn_count'] = getVarInt(payload_m)
+    payload['txns'] = []
+    for i in range(payload['txn_count']):
+        payload['txns'].append(parseTxPayload(payload_m))
+    return payload
+
+def parseFeeFilterPayload(payload_m: mmap, payloadlen = 0):
+    payload = {}
+    payload['feerate'] = int.from_bytes(payload_m.read(8), byteorder='little')
+    return payload
+
+def parseInvPayload(payload_m: mmap, payloadlen = 0):
+    payload = {}
+    payload['count'] = getVarInt(payload_m)
+    payload['inventory'] = []
+    for i in range(payload['count']):
+        inv = {}
+        inv['type'] = int.from_bytes(payload_m.read(4), byteorder='little')
+        inv['hash'] = payload_m.read(32)[::-1].hex()
+        payload['inventory'].append(inv)
+    return payload
+
 CMD_FN_MAP = {
     'version': parseVersionPayload,
     'addr': parseAddrPayload,
@@ -235,6 +364,11 @@ CMD_FN_MAP = {
     'ping': parsePingPongPayload,
     'getheaders': parseGetBlocksGetHeadersPayload,
     'getblocks': parseGetBlocksGetHeadersPayload,
+    'headers': parseHeadersPayload,
+    'block': parseBlockPayload,
+    'feefilter': parseFeeFilterPayload,
+    'inv': parseInvPayload,
+    'tx': parseTxPayload
 }
 
 def parseMsgHdr(msghdr_b: bytes):
@@ -262,8 +396,8 @@ def getRandomPeer():
     return peer
 
 def createVersionPayload(s: socket):
-#    version_b = struct.pack('<L', 70015)
-    version_b = struct.pack('<L', 70013)
+    version_b = struct.pack('<L', 70015)
+#    version_b = struct.pack('<L', 70013)
     services_b = struct.pack('<Q', 1)
     timestamp_b = struct.pack('<Q', int(time.time()))
     myip, myport = s.getsockname()
@@ -273,54 +407,92 @@ def createVersionPayload(s: socket):
     user_agent = createUserAgent()
     user_agent_b = struct.pack('<%ds' % len(user_agent), user_agent)
     start_height_b = struct.pack('<L', getLastBlockHeight())
-    payload = version_b + services_b + timestamp_b + addr_recv_b + addr_trans_b + nonce_b + user_agent_b + start_height_b
+    relay_b = struct.pack('<B', 1)
+    payload = version_b + services_b + timestamp_b + addr_recv_b + addr_trans_b + nonce_b + user_agent_b + start_height_b + relay_b
     return payload
 
 def createPongPayload(nonce: int):
     nonce_b = struct.pack('<Q', nonce)
     return nonce_b
 
-def createHeadersPayload(hashes, stophash):
-    b_cnt_d = {'fd': 2, 'fe': 4, 'ff': 8}
-    found = False
-    for blk_hash in hashes:
-        try:
-            blk = rpc_connection.getblock(blk_hash)
-            found = True
+def createGetHeadersPayload(hdr_info_l: list):
+    version_b = struct.pack('<L', 70015)
+#    version_b = struct.pack('<L', 70013)
+    blk_locator_hashes_b = b''
+    count = 0
+    for i in range(len(hdr_info_l) - 1, len(hdr_info_l) - 32, -1):
+        if i < 1: # assuming first block is genesis
             break
-        except Exception as e:
-            continue
-    if found == True:
-        txcnt = 0
-        txcnt_b = setVarInt(txcnt)
-        headers_b = b''
-        count = 0
-        while True:
-            # returns block hex
-            print('block_hash = %s' % blk_hash, file=flog)
-            blk = rpc_connection.getblock(blk_hash, False)
-            blk_b = bytes.fromhex(blk)
-            blkhdr_b = blk_b[:80]
-            headers_b += blkhdr_b + txcnt_b
-            blk = rpc_connection.getblock(blk_hash)
+        blk_locator_hashes_b += bytes.fromhex(hdr_info_l[i]['blkhash'])[::-1]
+        count += 1
+    blk_locator_hashes_b += bytes.fromhex(getGenesisBlockHash())[::-1]
+    count += 1
+    hash_count_b = setVarInt(count)
+    stop_hash_b = bytes(32)
+    payload = version_b \
+            + hash_count_b \
+            + blk_locator_hashes_b \
+            + stop_hash_b
+    return payload
+
+def createGetDataTxPayload(payload: dict):
+    MSG_TX = 1
+    data_b = b''
+    count = 0
+    for i in range(payload['count']):
+        # we only request data for tx
+        if payload['inventory'][i]['type'] == MSG_TX:
+            type_b = struct.pack('<L', payload['inventory'][i]['type'])
+            hash_b = bytes.fromhex(payload['inventory'][i]['hash'])[::-1]
+            data_b += type_b + hash_b
             count += 1
-            if count == 2000 or 'nextblockhash' not in blk or stophash == blk_hash:
-                print(count, file=flog)
-                print(stophash, file=flog)
-                break
-            blk_hash = blk['nextblockhash']
-        cnt_b = setVarInt(count)
-        payload = cnt_b + headers_b
-        return payload
+    count_b = setVarInt(count)
+    payload_b = count_b + data_b
+    return count, payload_b
+
+def createGetHeadersPayloadFromCoreCLI():
+    version_b = struct.pack('<L', 70015)
+    blk_locator_hashes_b = b''
+    count = 32
+    height = getLastBlockHeight()
+    for i in range(0, 31):
+        print(height - i)
+        blkhash = rpc_connection.getblockhash(height - i)
+        blk_locator_hashes_b += bytes.fromhex(blkhash)[::-1]
+    blk_locator_hashes_b += bytes.fromhex(getGenesisBlockHash())[::-1]
+    hash_count_b = setVarInt(count)
+    stop_hash_b = bytes(32)
+    payload = version_b \
+            + hash_count_b \
+            + blk_locator_hashes_b \
+            + stop_hash_b
+    return payload
+
+def createSendCompactPayload(announce: int, version: int):
+    announce_b = struct.pack('<B', announce)
+    version_b = struct.pack('<Q', version)
+    payload = announce_b + version_b
+    return payload
 
 MSGHDR_SIZE = 24
+
+def recvAll(s: socket, payloadlen: int):
+    payload_b = b''
+    length = payloadlen
+    while True:
+        recvd_b = s.recv(length)
+        payload_b += recvd_b
+        if len(payload_b) == payloadlen:
+            break
+        length = payloadlen - len(payload_b)
+    return payload_b
 
 def recvMsg(s: socket):
     global MSGHDR_SIZE, CMD_FN_MAP
     msghdr_b = s.recv(MSGHDR_SIZE)
     msg = parseMsgHdr(msghdr_b)
     payloadlen = msg['length']
-    payload_b = s.recv(payloadlen)
+    payload_b = recvAll(s, payloadlen)
     checkMessage(msg, payload_b)
     payload_m = mmap.mmap(-1, payloadlen + 1)
     payload_m.write(payload_b)
@@ -329,7 +501,49 @@ def recvMsg(s: socket):
     if payloadlen > 0:
         msg['payload'] = CMD_FN_MAP[msg['command']](payload_m, payloadlen)
     print('<== msg = %s' % msg, file=flog)
+    print('<== msg = %s' % msg)
     return msg
+
+def sendPongMessage(s: socket, recvmsg: dict):
+    # send pong message
+    sndcmd = 'pong'
+    nonce = recvmsg['payload']['nonce']
+    payload = createPongPayload(nonce)
+    sndmsg = createMessage(sndcmd, payload)
+    s.send(sndmsg)
+    print('==> cmd = %s, msg = %s' % (sndcmd, sndmsg.hex()), file=flog)
+
+def sendGetDataMessage(s: socket, recvmsg: dict):
+    sndcmd = 'getdata'
+    count, payload = createGetDataTxPayload(recvmsg['payload'])
+    sndmsg = createMessage(sndcmd, payload)
+    s.send(sndmsg)
+    print('==> cmd = %s, msg = %s' % (sndcmd, sndmsg.hex()), file=flog)
+    return count
+
+def waitForInvMessage(s: socket): 
+    while True:
+        recvmsg = recvMsg(s)
+        if recvmsg['command'] == 'inv':
+            break
+        elif recvmsg['command'] == 'ping':
+            sendPongMessage(s, recvmsg)
+    print('Received INV', file=flog)
+    return recvmsg
+
+def waitForTxMsg(s: socket):
+    while True:
+        recvmsg = recvMsg(s)
+        if recvmsg['command'] == 'tx':
+            break
+        elif recvmsg['command'] == 'ping':
+            sendPongMessage(s, recvmsg)
+
+def waitAndHandleInvTxnMessage(s: socket):
+    recvmsg = waitForInvMessage(s)
+    count = sendGetDataMessage(s, recvmsg)
+    for i in range(count):
+        waitForTxMsg(s)
 
 def establishConnection(s: socket):
     # send version messsage
@@ -346,7 +560,7 @@ def establishConnection(s: socket):
         vers_recvd = True
     services = recvmsg['payload']['services']
     if services & 1 == 0x00:
-        print('Peer is not a full node')
+        print('Peer is pruned node')
         return False
     # send verack message
     sndcmd = 'verack'
@@ -365,37 +579,14 @@ def establishConnection(s: socket):
         return True
     return False
 
+def sendrecvHeadersData(s: socket):
+    waitAndHandleInvTxnMessage(s)
+
 def sendrecvHandler(s: socket):
     if establishConnection(s) == False:
         print('Establish connection failed', file=flog)
         return
-    # send getaddr message
-    sndcmd = 'getaddr'
-    payload = b''
-    sndmsg = createMessage(sndcmd, payload)
-    s.send(sndmsg)
-    print('==> cmd = %s, msg = %s' % (sndcmd, sndmsg.hex()), file=flog)
-    while True:
-        recvmsg = recvMsg(s)
-        if recvmsg['command'] == 'addr':
-            break
-        elif recvmsg['command'] == 'ping':
-            # send pong message
-            sndcmd = 'pong'
-            nonce = recvmsg['payload']['nonce']
-            payload = createPongPayload(nonce)
-        elif recvmsg['command'] == 'getheaders':
-            # send header message
-            sndcmd = 'headers'
-            hashes = recvmsg['payload']['block locator hashes']
-            stophash = recvmsg['payload']['hash_stop']
-            payload = createHeadersPayload(hashes, stophash)
-        sndmsg = createMessage(sndcmd, payload)
-        s.send(sndmsg)
-        print('==> cmd = %s, msg = %s' % (sndcmd, sndmsg.hex()), file=flog)
-
-    if recvmsg['command'] == 'addr':
-        print('Received Addr', file=flog)
+    sendrecvHeadersData(s)
     
 if __name__ == '__main__':
     peers = getTestnetPeers()
