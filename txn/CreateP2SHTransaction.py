@@ -296,7 +296,7 @@ def signMessage(preimage_b: bytes,
     if privkey_s.__len__() % 2 == 1:
         privkey_s = "0{}".format(privkey_s)
     if compress == True:
-        print('compress is true')
+#        print('compress is true')
         privkey_b = bytes.fromhex(privkey_s)[:-1]
     else:
         privkey_b = bytes.fromhex(privkey_s)
