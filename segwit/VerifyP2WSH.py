@@ -532,6 +532,7 @@ def verifyScript(tx: dict, inp_index: int):
         prev_scriptpubkey_b = bytes([0x76, 0xa9, 0x14]) + prev_scriptpubkey_b[2:] + bytes([0x88, 0xac])
     if isP2WSH(prev_scriptpubkey_b) == True:
         print('P2WSH')
+        print('prev_scriptpubkey = ', prev_scriptpubkey_b.hex())
         prev_scriptpubkey_b = bytes([0xa8, 0x20]) + prev_scriptpubkey_b[2:] + bytes([0x87])
     execScript(prev_scriptpubkey_b, inp_index, tx)
     status = st.pop()

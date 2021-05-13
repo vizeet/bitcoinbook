@@ -221,17 +221,17 @@ def createMsgForSigForSegwit(tx: dict, script_b: bytes, inp_index: int, sighash_
     hashOutputs_b = hash256(outputs_b)
     hashType_b = struct.pack('<L', sighash_type)
     msg_b = version_b + hashPrevouts_b + hashSequence_b + outpoint_b + scriptCode_b + amount_b + sequence_b + hashOutputs_b + locktime_b + hashType_b
-    print('version = ', version_b.hex())
-    print('prevouts = ', prevouts_b.hex())
-    print('sequences = ', sequences_b.hex())
-    print('outpoint = ', outpoint_b.hex())
-    print('scriptCode = ', scriptCode_b.hex())
-    print('amount = ', amount_b.hex())
-    print('sequence = ', sequence_b.hex())
-    print('outputs = ', outputs_b.hex())
-    print('locktime = ', locktime_b.hex())
-    print('sighash_type = ', sighash_type)
-    print('tx_s = ', tx_s)
+#    print('version = ', version_b.hex())
+#    print('prevouts = ', prevouts_b.hex())
+#    print('sequences = ', sequences_b.hex())
+#    print('outpoint = ', outpoint_b.hex())
+#    print('scriptCode = ', scriptCode_b.hex())
+#    print('amount = ', amount_b.hex())
+#    print('sequence = ', sequence_b.hex())
+#    print('outputs = ', outputs_b.hex())
+#    print('locktime = ', locktime_b.hex())
+#    print('sighash_type = ', sighash_type)
+#    print('tx_s = ', tx_s)
     return msg_b
 
 def getRandSFromSig(sig_b: bytes):
@@ -302,24 +302,20 @@ def opHash160():
     v = st.pop()
     h = hash160(v)
     st.append(h)
-    printStack()
 
 def opSha256():
     v = st.pop()
     h = hashlib.sha256(v).digest()
     st.append(h)
-    printStack()
 
 def opDup():
     v = st.pop()
     st.append(v)
     st.append(v)
-    printStack()
 
 def opEqualVerify():
     v1 = st.pop()
     v2 = st.pop()
-    printStack()
     if v1 == v2:
         return True
     else:
@@ -332,7 +328,6 @@ def opEqual():
         st.append(b'\x01')
     else:
         st.append(b'\x00')
-    printStack()
 
 def opNum(b: int):
     num = b - 0x50
@@ -340,7 +335,6 @@ def opNum(b: int):
 
 def opCheckSig(script_b: bytes, inp_index: int, tx: dict):
     global tx_b, st
-    printStack()
     pubkey_b = st.pop()
     sig_b = st.pop()
     v = sigcheck(sig_b, pubkey_b, script_b, inp_index, tx)
@@ -348,7 +342,6 @@ def opCheckSig(script_b: bytes, inp_index: int, tx: dict):
 
 def opCheckMultisig(script_b: bytes, inp_index: int, is_segwit: bool):
     global tx_b
-    printStack()
     pubkey_cnt = int.from_bytes(st.pop(), byteorder='big')
     pubkey_l = [st.pop() for i in range(pubkey_cnt)][::-1]
     sig_cnt = int.from_bytes(st.pop(), byteorder='big')
@@ -362,7 +355,6 @@ def opCheckMultisig(script_b: bytes, inp_index: int, is_segwit: bool):
                 break
     # convert True/False to b'\x01' or b'\x00'
     b = bytes([int(sig_index == sig_cnt and v == b'\x01')])
-    print('multisig result = %s' % b.hex())
     st.append(b)
 
 def pushdata(d: bytes):
@@ -380,13 +372,9 @@ def printStack():
 def execScript(script_b: bytes, inp_index: int, tx: dict):
     l = len(script_b)
     script_m = bytes2Mmap(script_b)
-    print('last ptr = %x' % l)
     while script_m.tell() < l:
-        printStack()
-        print('current ptr = %x' % script_m.tell())
         v = script_m.read(1)
         b = int.from_bytes(v, byteorder='big')
-        print('b = %x' % b)
         if b in g_pushdata:
             d = script_m.read(b)
             pushdata(d)
@@ -409,9 +397,7 @@ def execScript(script_b: bytes, inp_index: int, tx: dict):
 
 def checkWrappedMultisig(st):
     script_b = st[-1]
-    print('script = ', script_b.hex())
     val = script_b[-2]
-    print('val = ', val)
     if bytes([script_b[-1]]) == b'\xae' and val in g_pushnumber:
         return True
     else:
@@ -419,18 +405,14 @@ def checkWrappedMultisig(st):
 
 def checkWrappedP2WPKH(st):
     script_b = st[-1]
-    print('script = ', script_b.hex())
     if script_b[:2] == b'\x00\x14' and len(script_b) == 22:
-        print('P2SH_P2WPKH')
         return True
     else:
         return False
 
 def checkWrappedP2WSH(st):
     script_b = st[-1]
-    print('script = ', script_b.hex())
     if script_b[:2] == b'\x00\x20' and len(script_b) == 34:
-        print('P2SH_P2WSH')
         return True
     else:
         return False
@@ -520,7 +502,6 @@ def getTransactionInfo(tx_m: mmap):
     locktime_b = tx_m.read(4)
     txid_b += locktime_b
     tx['locktime'] = int.from_bytes(locktime_b, byteorder='little')
-    print(txid_b.hex())
     tx['txid'] = hash256(txid_b)[::-1].hex()
     return tx
 
@@ -539,7 +520,7 @@ def isP2WPKH(prev_scriptpubkey_b: bytes):
     return False
 
 def isP2WSH(prev_scriptpubkey_b: bytes):
-    #0014<20 bytes>
+    #0020<32 bytes>
     if len(prev_scriptpubkey_b) == 34 and prev_scriptpubkey_b[0:2] == b'\x00\x20':
         return True
     return False
@@ -554,7 +535,6 @@ def verifyScript(tx: dict, inp_index: int):
         pushWitnessData(witness_l)
     else:
         execScript(scriptsig_b, inp_index, tx)
-    print(st)
     prev_scriptpubkey_b = getPrevScriptPubKey(tx, inp_index)
     isP2SH = False
     if checkWrappedP2WPKH(st) == True:
@@ -562,27 +542,23 @@ def verifyScript(tx: dict, inp_index: int):
         st.pop()
         witness_l = getWitnessList(tx, inp_index)
         pushWitnessData(witness_l)
-        print('P2SH_P2PKH')
+        print('P2SH_P2WPKH')
     if checkWrappedP2WSH(st) == True:
         prev_scriptpubkey_b = st[-1]
         st.pop()
         witness_l = getWitnessList(tx, inp_index)
         pushWitnessData(witness_l)
-        print('P2SH_P2SH')
+        print('P2SH_P2WSH')
     if checkWrappedMultisig(st) == True:
         redeemscript_b = st[-1]
         isP2SH = True
         print('P2SH')
     if isP2WPKH(prev_scriptpubkey_b) == True:
         print('P2WPKH')
-        print(prev_scriptpubkey_b.hex())
         prev_scriptpubkey_b = bytes([0x76, 0xa9, 0x14]) + prev_scriptpubkey_b[2:] + bytes([0x88, 0xac])
-        print(prev_scriptpubkey_b.hex())
     if isP2WSH(prev_scriptpubkey_b) == True:
         print('P2WSH')
-        print(prev_scriptpubkey_b.hex())
         prev_scriptpubkey_b = bytes([0xa8, 0x20]) + prev_scriptpubkey_b[2:] + bytes([0x87])
-        print(prev_scriptpubkey_b.hex())
     print('previous scriptpubkey = ', prev_scriptpubkey_b.hex())
     execScript(prev_scriptpubkey_b, inp_index, tx)
     status = st.pop()

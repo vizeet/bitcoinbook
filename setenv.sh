@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-export BITCOIN_HOME=~/snap/bitcoin-core/common/.bitcoin.bkp
+export BITCOIN_HOME=~/snap/bitcoin-core/common/.bitcoin
 export BLOCKS_PATH=$BITCOIN_HOME/blocks/
 export CHAINSTATE_DB=$BITCOIN_HOME/chainstate
 export BLOCK_INDEX_DB=$BITCOIN_HOME/blocks/index

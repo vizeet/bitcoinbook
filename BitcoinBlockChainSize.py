@@ -3,7 +3,7 @@ import datetime
 import pandas as pd
 from bitcoinrpc.authproxy import AuthServiceProxy, JSONRPCException
 
-rpc_connection = AuthServiceProxy("http://%s:%s@127.0.0.1:8332"%('test', 'test'))
+rpc_connection = AuthServiceProxy("http://%s:%s@127.0.0.1:8332"%('test', 'test'), timeout=120)
 
 def getBlockHash(block_height: int):
         block_hash = rpc_connection.getblockhash(block_height)
@@ -42,8 +42,12 @@ def getDfDatetimeBlockchainSize():
 if __name__ == '__main__':
     df = getDfDatetimeBlockchainSize()
     fig = px.line(df, x='Date', y='Blockchain Size')
-    fig.update_layout(title_text="Bitcoin Blockchain Size", title_x=0.5)
-#    fig.update_yaxes(title_text="Blockchain size", ticksuffix = 'GB')
+    fig.update_layout(title_text="Bitcoin Blockchain Size",
+        title_x=0.5, font=dict(size=20), hoverlabel=dict(font_size=20))
     fig.update_yaxes(title_text="Blockchain size(GB)")
-    fig.update_xaxes(title_text="Year")
+    fig.update_xaxes(
+        title_text="Year",
+        tickvals=['2009', '2010', '2011', '2012', '2013', '2014', '2015', '2016', '2017', '2018', '2019', '2020', '2021'],
+        tickformat="%Y")
+
     fig.show()

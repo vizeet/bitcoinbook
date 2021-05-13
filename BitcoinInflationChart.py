@@ -3,7 +3,7 @@ import datetime
 import pandas as pd
 from bitcoinrpc.authproxy import AuthServiceProxy, JSONRPCException
 
-rpc_connection = AuthServiceProxy("http://%s:%s@127.0.0.1:8332"%('test', 'test'))
+rpc_connection = AuthServiceProxy("http://%s:%s@127.0.0.1:8332"%('test', 'test'), timeout = 120)
 
 init_block_reward = 50
 final_bitcoin_in_circulation = 21000000
@@ -61,7 +61,12 @@ def getDfDateTimeInflation():
 if __name__ == '__main__':
     df = getDfDateTimeInflation()
     fig = px.line(df, x='Date', y='Inflation')
-    fig.update_layout(title_text="Bitcoin Inflation Rate", title_x=0.5)
+    fig.update_layout(
+        title_text="Bitcoin Inflation Rate",
+        title_x=0.5, font=dict(size=20), hoverlabel=dict(font_size=20))
     fig.update_yaxes(title_text="Bitcoin Mined", ticksuffix = '%')
-    fig.update_xaxes(title_text="Year")
+    fig.update_xaxes(
+        title_text="Year",
+#        tickvals=['2009', '2010', '2011', '2012', '2013', '2014', '2015', '2016', '2017', '2018', '2019', '2020', '2021'],
+        tickformat="%Y")
     fig.show()
